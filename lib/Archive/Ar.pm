@@ -323,7 +323,7 @@ sub _parseData
 		{
 			my @fields = unpack("A16A12A6A6A8A10", $1);
 
-			for(0..@fields)
+			for(0..$#fields)
 			{
 				$fields[$_] ||= "";
 				$fields[$_] =~ s/\s*$//g;
