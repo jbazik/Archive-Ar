@@ -319,7 +319,7 @@ sub _parseData
 	while($scratchdata =~ /\S/)
 	{
 
-		if($scratchdata =~ s/^(.{58})`\n//m)		
+		if($scratchdata =~ s/^(.{58})`\n//s)
 		{
 			my @fields = unpack("A16A12A6A6A8A10", $1);
 
