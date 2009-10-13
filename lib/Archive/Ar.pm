@@ -135,7 +135,7 @@ sub list_files
 {
 	my($this) = @_;
 
-	return \@{$this->{_files}};
+        return wantarray ? @{$this->{_files}} : $this->{_files};
 
 }
 
