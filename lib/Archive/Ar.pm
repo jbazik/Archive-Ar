@@ -135,7 +135,7 @@ sub list_files
 {
 	my($this) = @_;
 
-        return wantarray ? @{$this->{_files}} : $this->{_files};
+	return wantarray ? @{$this->{_files}} : $this->{_files};
 
 }
 
@@ -252,10 +252,13 @@ sub write
 
 		$content->{uid} ||= "";
 		$content->{gid} ||= "";
-
 		$outstr.= pack("A16A12A6A6A8A10", @$content{qw/name date uid gid mode size/});
 		$outstr.= ARFMAG;
 		$outstr.= $content->{data};
+		unless (((length($content->{data})) % 2) == 0) {
+			# Padding to make up an even number of bytes
+			$outstr.= "\n";
+		}
 	}
 
 	return $outstr unless $filename;
@@ -333,6 +336,8 @@ sub _parseData
 			@$headers{qw/name date uid gid mode size/} = @fields;
 
 			$headers->{data} = substr($scratchdata, 0, $headers->{size}, "");
+			# delete padding, if any
+                        substr($scratchdata, 0, $headers->{size} % 2, "");
 
 			$this->_addFile($headers);
 		}else{
