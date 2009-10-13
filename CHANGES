@@ -1,0 +1,31 @@
+Version 1.13b - May 7th, 2003
+
+Fixes to the Makefile.PL file. Ar.pm wasn't being put into /blib
+Style fix to a line with non-standard unless parenthesis
+
+
+Version 1.13 - April 30th, 2003
+
+Removed unneeded exports. Thanks to pudge for the pointer.
+
+
+Version 1.12 - April 14th, 2003
+
+Found podchecker. CPAN HTML documentation should work right now.
+
+
+Version 1.11 - April 10th, 2003
+
+Trying to get the HTML POD documentation to come out correctly
+
+
+Version 1.1 - April 10th, 2003
+
+Documentation cleanups
+Added a C<remove()> function
+
+
+Version 1.0 - April 7th, 2003
+
+This is the initial public release for CPAN, so everything is new.
+
