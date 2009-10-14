@@ -219,7 +219,7 @@ sub add_data
 	$params->{uid} ||= 0;
 	$params->{gid} ||= 0;
 	$params->{date} ||= timelocal(localtime());
-	$params->{mode} ||= "100644";
+	$params->{mode} ||= 0100644;
 	
 	unless($this->_addFile($params))
 	{
@@ -252,7 +252,10 @@ sub write
 
 		$content->{uid} ||= "";
 		$content->{gid} ||= "";
-		$outstr.= pack("A16A12A6A6A8A10", @$content{qw/name date uid gid mode size/});
+		$outstr.= pack("A16A12A6A6A8A10",
+			@$content{qw/name date uid gid/},
+			sprintf('%o', $content->{mode}),  # octal!
+			$content->{size});
 		$outstr.= ARFMAG;
 		$outstr.= $content->{data};
 		unless (((length($content->{data})) % 2) == 0) {
@@ -324,20 +327,19 @@ sub _parseData
 
 		if($scratchdata =~ s/^(.{58})`\n//s)
 		{
-			my @fields = unpack("A16A12A6A6A8A10", $1);
-
-			for(0..$#fields)
-			{
-				$fields[$_] ||= "";
-				$fields[$_] =~ s/\s*$//g;
-			}
-
 			my $headers = {};
-			@$headers{qw/name date uid gid mode size/} = @fields;
+			@$headers{qw/name date uid gid mode size/} =
+				unpack("A16A12A6A6A8A10", $1);
+
+			for (values %$headers) {
+				$_ ||= "";
+				$_ =~ s/\s*$//;
+			}
+			$headers->{mode} = oct($headers->{mode});
 
 			$headers->{data} = substr($scratchdata, 0, $headers->{size}, "");
 			# delete padding, if any
-                        substr($scratchdata, 0, $headers->{size} % 2, "");
+			substr($scratchdata, 0, $headers->{size} % 2, "");
 
 			$this->_addFile($headers);
 		}else{
