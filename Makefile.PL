@@ -9,6 +9,7 @@ WriteMakefile(
 			'File::Spec' => '0.83',
 			'Time::Local' => '1.04',
 			'Test::MockObject' => '0.12',
+			'File::Temp' => '0',
 		},
 
 	'dist'		=> 

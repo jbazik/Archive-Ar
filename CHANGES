@@ -1,3 +1,18 @@
+Version 1.14 - October 14, 2009 - John Bazik <jbazik@cpan.org>
+
+	* Fix list_files to return a list in list context, to match doc.
+
+	* Fixed improper use of /m modifier in anchored match.
+
+	* Pad odd-size archives to an even number of bytes.
+	  Closes RT #18383 (thanks to David Dick).
+
+	* Fixed broken file perms (decimal mode stored as octal string).
+	  Closes RT #49987 (thanks to Stephen Gran - debian bug #523515).
+
+	* Added tests for padding and permission fixes.  Dropped
+	  unnecessary BEGIN clauses from some tests.
+
 Version 1.13b - May 7th, 2003
 
 Fixes to the Makefile.PL file. Ar.pm wasn't being put into /blib

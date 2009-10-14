@@ -14,7 +14,7 @@ use File::Spec;
 use Time::Local;
 
 use vars qw($VERSION);
-$VERSION = '1.13b';
+$VERSION = '1.14';
 
 use constant ARMAG => "!<arch>\n";
 use constant SARMAG => length(ARMAG);
@@ -538,6 +538,7 @@ Returns the number of bytes read (processed) if successful, undef otherwise.
 =item * C<list_files()>
 
 This lists the files contained inside of the archive by filename, as an array.
+If called in a scalar context, returns a reference to an array.
 
 =back
 
@@ -572,7 +573,7 @@ data is a hash that looks like:
         "uid" => $uid, #defaults to zero
         "gid" => $gid, #defaults to zero
         "date" => $date,  #date in epoch seconds. Defaults to now.
-        "mode" => $mode, #defaults to "100644";
+        "mode" => $mode, #defaults to 0100644;
 	}
 
 You cannot add_data over another file however.  This returns the file length in 
@@ -641,6 +642,16 @@ while using the module.
 =head1 CHANGES
 
 =over 4
+
+=item * B<Version 1.14> - October 14, 2009
+
+Fix list_files to return a list in list context, to match doc.
+
+Pad odd-size archives to an even number of bytes.
+Closes RT #18383 (thanks to David Dick).
+
+Fixed broken file perms (decimal mode stored as octal string).
+Closes RT #49987 (thanks to Stephen Gran - debian bug #523515).
 
 =item * B<Version 1.13b> - May 7th, 2003
 
