@@ -2,11 +2,6 @@
 
 use Test::More tests => 13;
 
-BEGIN {
-        chdir 't' if -d 't';
-        use lib '../blib/lib', 'lib/', '..';
-}
-
 my $mod = "Archive::Ar";
 
 use_ok("File::Spec");

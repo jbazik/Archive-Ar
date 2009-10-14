@@ -3,11 +3,6 @@
 use Test::More tests => 9;
 use Test::MockObject;
 
-BEGIN {
-        chdir 't' if -d 't';
-        use lib '../blib/lib', 'lib/', '..';
-}
-
 my $mod = "Archive::Ar";
 my $mock = new Test::MockObject;
 my $ar;
