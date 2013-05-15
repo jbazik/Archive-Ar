@@ -183,6 +183,7 @@ sub add_files
 			$this->_dowarn("Could not open filename. add_files() for this file failed");
 			next;
 		}
+		binmode HANDLE;
 		$header->{data} = <HANDLE>;
 		close HANDLE;
 
@@ -271,6 +272,7 @@ sub write
 		$this->_dowarn("Can't open filename $filename");
 		return;
 	}
+	binmode HANDLE;
 	print HANDLE $outstr;
 	close HANDLE;
 	return length($outstr);
@@ -357,6 +359,7 @@ sub _readFromFilename
 
 	my $handle;
 	open $handle, $filename or return;
+	binmode $handle;
 	return $this->_readFromFilehandle($handle);
 }
 
