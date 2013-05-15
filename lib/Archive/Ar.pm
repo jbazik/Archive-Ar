@@ -14,7 +14,7 @@ use File::Spec;
 use Time::Local;
 
 use vars qw($VERSION);
-$VERSION = '1.14';
+$VERSION = '1.15';
 
 use constant ARMAG => "!<arch>\n";
 use constant SARMAG => length(ARMAG);
@@ -645,6 +645,10 @@ while using the module.
 =head1 CHANGES
 
 =over 4
+
+=item * B<Version 1.15> - May 14, 2013
+
+Use binmode for portability.  Closes RT #81310 (thanks to Stanislav Meduna).
 
 =item * B<Version 1.14> - October 14, 2009
 
