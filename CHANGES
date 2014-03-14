@@ -1,3 +1,7 @@
+Version 1.17 - Mar 14, 2014 - John Bazik <jbazik@cpan.org>
+
+	* Fixed MANIFEST goof.  Doh!
+ 
 Version 1.16 - Mar 14, 2014 - John Bazik <jbazik@cpan.org>
 
 	* Set size to zero, not the empty string, in the case of empty

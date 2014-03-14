@@ -14,7 +14,7 @@ use File::Spec;
 use Time::Local;
 
 use vars qw($VERSION);
-$VERSION = '1.16';
+$VERSION = '1.17';
 
 use constant ARMAG => "!<arch>\n";
 use constant SARMAG => length(ARMAG);
