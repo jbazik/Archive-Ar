@@ -14,7 +14,7 @@ use File::Spec;
 use Time::Local;
 
 use vars qw($VERSION);
-$VERSION = '1.15';
+$VERSION = '1.16';
 
 use constant ARMAG => "!<arch>\n";
 use constant SARMAG => length(ARMAG);
@@ -334,7 +334,6 @@ sub _parseData
 				unpack("A16A12A6A6A8A10", $1);
 
 			for (values %$headers) {
-				$_ ||= "";
 				$_ =~ s/\s*$//;
 			}
 			$headers->{mode} = oct($headers->{mode});
