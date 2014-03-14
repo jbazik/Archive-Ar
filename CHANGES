@@ -1,7 +1,12 @@
+Version 1.16 - Mar 14, 2014 - John Bazik <jbazik@cpan.org>
+
+	* Set size to zero, not the empty string, in the case of empty
+	  member files (thanks to Michael J. Mestnik).
+
 Version 1.15 - May 14, 2013 - John Bazik <jbazik@cpan.org>
 
 	* Use binmode for portability.  Closes RT #81310 (thanks to
-          Stanislav Meduna).
+	  Stanislav Meduna).
 
 Version 1.14 - October 14, 2009 - John Bazik <jbazik@cpan.org>
 
