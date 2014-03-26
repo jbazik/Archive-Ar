@@ -1,10 +1,10 @@
 package Archive::Ar;
 
 ###########################################################
-#	Archive::Ar - Pure perl module to handle ar achives
-#	
-#	Copyright 2003 - Jay Bonci <jaybonci@cpan.org>
-#	Licensed under the same terms as perl itself
+#    Archive::Ar - Pure perl module to handle ar achives
+#    
+#    Copyright 2003 - Jay Bonci <jaybonci@cpan.org>
+#    Licensed under the same terms as perl itself
 #
 ###########################################################
 
@@ -21,427 +21,370 @@ use constant SARMAG => length(ARMAG);
 use constant ARFMAG => "`\n";
 
 sub new {
-	my ($class, $filenameorhandle, $debug) = @_;
+    my $class = shift;
+    my ($filenameorhandle, $debug) = @_;
 
-	my $this = {};
+    my $self = bless {}, $class;
 
-	my $obj = bless $this, $class;
+    $self->{_verbose} = 0;
+    $self->_initValues();
 
-	$obj->{_verbose} = 0;
-	$obj->_initValues();
+    if ($debug) {
+        $self->DEBUG();
+    }
 
-
-	if($debug)
-	{
-		$obj->DEBUG();
-	}
-
-	if($filenameorhandle){
-		unless($obj->read($filenameorhandle)){
-			$obj->_dowarn("new() failed on filename or filehandle read");
-			return;
-		}		
-	}
-
-	return $obj;
+    if ($filenameorhandle) {
+        unless ($self->read($filenameorhandle)) {
+            $self->_dowarn("new() failed on filename or filehandle read");
+            return;
+        }        
+    }
+    return $self;
 }
 
-sub read
-{
-	my ($this, $filenameorhandle) = @_;
+sub read {
+    my $self = shift;
+    my ($filenameorhandle) = @_;
 
-	my $retval;
+    my $retval;
 
-	$this->_initValues();
+    $self->_initValues();
 
-	if(ref $filenameorhandle eq "GLOB")
-	{
-		unless($retval = $this->_readFromFilehandle($filenameorhandle))
-		{
-			$this->_dowarn("Read from filehandle failed");
-			return;
-		}
-	}else
-	{
-		unless($retval = $this->_readFromFilename($filenameorhandle))
-		{
-			$this->_dowarn("Read from filename failed");
-			return;
-		}
-	}
+    if (ref $filenameorhandle eq "GLOB") {
+        unless ($retval = $self->_readFromFilehandle($filenameorhandle)) {
+            $self->_dowarn("Read from filehandle failed");
+            return;
+        }
+    }
+    else {
+        unless ($retval = $self->_readFromFilename($filenameorhandle)) {
+            $self->_dowarn("Read from filename failed");
+            return;
+        }
+    }
 
-
-	unless($this->_parseData())
-	{
-		$this->_dowarn("read() failed on data structure analysis. Probable bad file");
-		return; 
-	}
-
-	
-	return $retval;
+    unless ($self->_parseData()) {
+        $self->_dowarn(
+                "read() failed on data structure analysis. Probable bad file");
+        return; 
+    }
+    return $retval;
 }
 
-sub read_memory
-{
-	my ($this, $data) = @_;
+sub read_memory {
+    my $self = shift;
+    my ($data) = @_;
 
-	$this->_initValues();
+    $self->_initValues();
 
-	unless($data)
-	{
-		$this->_dowarn("read_memory() can't continue because no data was given");
-		return;
-	}
+    unless ($data) {
+        $self->_dowarn("read_memory() can't continue because no data was given");
+        return;
+    }
 
-	$this->{_filedata} = $data;
+    $self->{_filedata} = $data;
 
-	unless($this->_parseData())
-	{
-		$this->_dowarn("read_memory() failed on data structure analysis. Probable bad file");
-		return;
-	}
-
-	return length($data);
+    unless ($self->_parseData()) {
+        $self->_dowarn(
+            "read_memory() failed on data structure analysis. Probable bad file");
+        return;
+    }
+    return length($data);
 }
 
-sub remove
-{
-	my($this, $filenameorarray, @otherfiles) = @_;
+sub remove {
+    my $self = shift;
+    my $files = ref $_[0] ? shift : \@_;
 
-	my $filelist;
+    my $filecount = 0;
 
-	if(ref $filenameorarray eq "ARRAY")
-	{
-		$filelist = $filenameorarray;
-	}else{
-		$filelist = [$filenameorarray];
-		if(@otherfiles)
-		{
-			push @$filelist, @otherfiles;
-		}      
-	}
-
-	my $filecount = 0;
-
-	foreach my $file (@$filelist)
-	{
-		$filecount += $this->_remFile($file);
-	}
-
-	return $filecount;
+    for my $file (@$files) {
+        $filecount += $self->_remFile($file);
+    }
+    return $filecount;
 }
 
-sub list_files
-{
-	my($this) = @_;
+sub list_files {
+    my $self = shift;
 
-	return wantarray ? @{$this->{_files}} : $this->{_files};
-
+    return wantarray ? @{$self->{_files}} : $self->{_files};
 }
 
-sub add_files
-{
-	my($this, $filenameorarray, @otherfiles) = @_;
-	
-	my $filelist;
+sub add_files {
+    my $self = shift;
+    my $files = ref $_[0] ? shift : \@_;
+    
+    my $filecount = 0;
 
-	if(ref $filenameorarray eq "ARRAY")
-	{
-		$filelist = $filenameorarray;
-	}else
-	{
-		$filelist = [$filenameorarray];
-		if(@otherfiles)
-		{
-			push @$filelist, @otherfiles;
-		}
-	}
+    for my $filename (@$files) {
+        my @props = stat($filename);
+        unless (@props) {
+            $self->_dowarn(
+               "Could not stat() filename. add_files() for this file failed");
+            next;
+        }
+        my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,$blksize,$blocks) = @props;  
+        
+        my $header = {
+            "date" => $mtime,
+            "uid"  => $uid,
+            "gid"  => $gid, 
+            "mode" => $mode,
+            "size" => $size,
+        };
 
-	my $filecount = 0;
+        local $/ = undef;
+        unless (open HANDLE, $filename) {
+            $self->_dowarn(
+                    "Could not open filename. add_files() for this file failed");
+            next;
+        }
+        binmode HANDLE;
+        $header->{data} = <HANDLE>;
+        close HANDLE;
 
-	foreach my $filename (@$filelist)
-	{
-		my @props = stat($filename);
-		unless(@props)
-		{
-			$this->_dowarn("Could not stat() filename. add_files() for this file failed");
-			next;
-		}
-		my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,$atime,$mtime,$ctime,$blksize,$blocks) = @props;  
-		
-		my $header = {
-			"date" => $mtime,
-			"uid"  => $uid,
-			"gid"  => $gid, 
-			"mode" => $mode,
-			"size" => $size,
-		};
+        # fix the filename
 
-		local $/ = undef;
-		unless(open HANDLE, $filename)
-		{
-			$this->_dowarn("Could not open filename. add_files() for this file failed");
-			next;
-		}
-		binmode HANDLE;
-		$header->{data} = <HANDLE>;
-		close HANDLE;
+        (undef, undef, $filename) = File::Spec->splitpath($filename);
+        $header->{name} = $filename;
 
-		# fix the filename
+        $self->_addFile($header);
 
-		(undef, undef, $filename) = File::Spec->splitpath($filename);
-		$header->{name} = $filename;
+        $filecount++;
+    }
 
-		$this->_addFile($header);
-
-		$filecount++;
-	}
-
-	return $filecount;
+    return $filecount;
 }
 
-sub add_data
-{
-	my($this, $filename, $data, $params) = @_;
-	unless ($filename)
-	{
-		$this->_dowarn("No filename given; add_data() can't proceed");
-		return;
-	}
+sub add_data {
+    my $self = shift;
+    my ($filename, $data, $params) = @_;
 
-	$params ||= {};
-	$data ||= "";
-	
-	(undef, undef, $filename) = File::Spec->splitpath($filename);
-	
-	$params->{name} = $filename;	
-	$params->{size} = length($data);
-	$params->{data} = $data;
-	$params->{uid} ||= 0;
-	$params->{gid} ||= 0;
-	$params->{date} ||= timelocal(localtime());
-	$params->{mode} ||= 0100644;
-	
-	unless($this->_addFile($params))
-	{
-		$this->_dowarn("add_data failed due to a failure in _addFile");
-		return;
-	}
+    unless ($filename) {
+        $self->_dowarn("No filename given; add_data() can't proceed");
+        return;
+    }
 
-	return $params->{size}; 	
+    $params ||= {};
+    $data ||= "";
+    
+    (undef, undef, $filename) = File::Spec->splitpath($filename);
+    
+    $params->{name} = $filename;    
+    $params->{size} = length($data);
+    $params->{data} = $data;
+    $params->{uid} ||= 0;
+    $params->{gid} ||= 0;
+    $params->{date} ||= timelocal(localtime());
+    $params->{mode} ||= 0100644;
+    
+    unless ($self->_addFile($params)) {
+        $self->_dowarn("add_data failed due to a failure in _addFile");
+        return;
+    }
+
+    return $params->{size};     
 }
 
-sub write
-{
-	my($this, $filename) = @_;
+sub write {
+    my $self = shift;
+    my ($filename) = @_;
 
-	my $outstr;
+    my $outstr;
 
-	$outstr= ARMAG;
-	foreach(@{$this->{_files}})
-	{
-		my $content = $this->get_content($_);
-		unless($content)
-		{
-			$this->_dowarn("Internal Error. $_ file in _files list but no filedata");
-			next;
-		}
-		
+    $outstr= ARMAG;
+    for (@{$self->{_files}}) {
+        my $content = $self->get_content($_);
+        unless ($content) {
+            $self->_dowarn(
+                    "Internal Error. $_ file in _files list but no filedata");
+            next;
+        }
 
-		# For whatever reason, the uids and gids get stripped
-		# if they are zero. We'll blank them here to emulate that
+        # For whatever reason, the uids and gids get stripped
+        # if they are zero. We'll blank them here to emulate that
 
-		$content->{uid} ||= "";
-		$content->{gid} ||= "";
-		$outstr.= pack("A16A12A6A6A8A10",
-			@$content{qw/name date uid gid/},
-			sprintf('%o', $content->{mode}),  # octal!
-			$content->{size});
-		$outstr.= ARFMAG;
-		$outstr.= $content->{data};
-		unless (((length($content->{data})) % 2) == 0) {
-			# Padding to make up an even number of bytes
-			$outstr.= "\n";
-		}
-	}
+        $content->{uid} ||= "";
+        $content->{gid} ||= "";
+        $outstr.= pack("A16A12A6A6A8A10",
+            @$content{qw/name date uid gid/},
+            sprintf('%o', $content->{mode}),  # octal!
+            $content->{size});
+        $outstr.= ARFMAG;
+        $outstr.= $content->{data};
+        unless (((length($content->{data})) % 2) == 0) {
+            # Padding to make up an even number of bytes
+            $outstr.= "\n";
+        }
+    }
+    return $outstr unless $filename;
 
-	return $outstr unless $filename;
-
-	unless(open HANDLE, ">$filename")
-	{
-		$this->_dowarn("Can't open filename $filename");
-		return;
-	}
-	binmode HANDLE;
-	print HANDLE $outstr;
-	close HANDLE;
-	return length($outstr);
+    unless (open HANDLE, ">$filename") {
+        $self->_dowarn("Can't open filename $filename");
+        return;
+    }
+    binmode HANDLE;
+    print HANDLE $outstr;
+    close HANDLE;
+    return length($outstr);
 }
 
-sub get_content
-{
-	my ($this, $filename) = @_;
+sub get_content {
+    my $self = shift;
+    my ($filename) = @_;
 
-	unless($filename)
-	{
-		$this->_dowarn("get_content can't continue without a filename");
-		return;
-	}
+    unless ($filename) {
+        $self->_dowarn("get_content can't continue without a filename");
+        return;
+    }
 
-	unless(exists($this->{_filehash}->{$filename}))
-	{
-		$this->_dowarn("get_content failed because there is not a file named $filename");
-		return;
-	}
+    unless (exists($self->{_filehash}->{$filename})) {
+        $self->_dowarn(
+                "get_content failed because there is not a file named $filename");
+        return;
+    }
 
-	return $this->{_filehash}->{$filename};
+    return $self->{_filehash}->{$filename};
 }
 
-sub DEBUG
-{
-	my($this, $verbose) = @_;
-	$verbose = 1 unless(defined($verbose) and int($verbose) == 0);
-	$this->{_verbose} = $verbose;
-	return;
-
+sub WARN {
+    my $self = shift;
+    my $warn = shift;
+    $self->{_warn} = 1 unless defined($warn) && int($warn) == 0;
 }
 
-sub _parseData
-{
-	my($this) = @_;
+sub DEBUG {
+    my $self = shift;
+    my ($verbose) = @_;
 
-	unless($this->{_filedata})
-	{
-		$this->_dowarn("Cannot parse this archive. It appears to be blank");
-		return;
-	}
-
-	my $scratchdata = $this->{_filedata};
-
-	unless(substr($scratchdata, 0, SARMAG, "") eq ARMAG)
-	{
-		$this->_dowarn("Bad magic header token. Either this file is not an ar archive, or it is damaged. If you are sure of the file integrity, Archive::Ar may not support this type of ar archive currently. Please report this as a bug");
-		return "";
-	}
-
-	while($scratchdata =~ /\S/)
-	{
-
-		if($scratchdata =~ s/^(.{58})`\n//s)
-		{
-			my $headers = {};
-			@$headers{qw/name date uid gid mode size/} =
-				unpack("A16A12A6A6A8A10", $1);
-
-			for (values %$headers) {
-				$_ =~ s/\s*$//;
-			}
-			$headers->{mode} = oct($headers->{mode});
-
-			$headers->{data} = substr($scratchdata, 0, $headers->{size}, "");
-			# delete padding, if any
-			substr($scratchdata, 0, $headers->{size} % 2, "");
-
-			$this->_addFile($headers);
-		}else{
-			$this->_dowarn("File format appears to be corrupt. The file header is not of the right size, or does not exist at all");
-			return;
-		}
-	}
-
-	return scalar($this->{_files});
+    $verbose = 1 unless (defined($verbose) and int($verbose) == 0);
+    $self->{_verbose} = $verbose;
+    return;
 }
 
-sub _readFromFilename
-{
-	my ($this, $filename) = @_;
+sub _parseData {
+    my $self = shift;
 
-	my $handle;
-	open $handle, $filename or return;
-	binmode $handle;
-	return $this->_readFromFilehandle($handle);
+    unless ($self->{_filedata}) {
+        $self->_dowarn("Cannot parse this archive. It appears to be blank");
+        return;
+    }
+    my $scratchdata = $self->{_filedata};
+
+    unless (substr($scratchdata, 0, SARMAG, "") eq ARMAG) {
+        $self->_dowarn("Bad magic header token. Either this file is not an ar archive, or it is damaged. If you are sure of the file integrity, Archive::Ar may not support this type of ar archive currently. Please report this as a bug");
+        return "";
+    }
+
+    while ($scratchdata =~ /\S/) {
+        if ($scratchdata =~ s/^(.{58})`\n//s) {
+            my $headers = {};
+            @$headers{qw/name date uid gid mode size/} =
+                unpack("A16A12A6A6A8A10", $1);
+
+            for (values %$headers) {
+                $_ =~ s/\s*$//;
+            }
+            $headers->{mode} = oct($headers->{mode});
+
+            $headers->{data} = substr($scratchdata, 0, $headers->{size}, "");
+            # delete padding, if any
+            substr($scratchdata, 0, $headers->{size} % 2, "");
+
+            $self->_addFile($headers);
+        }
+        else {
+            $self->_dowarn("File format appears to be corrupt. The file header is not of the right size, or does not exist at all");
+            return;
+        }
+    }
+
+    return scalar($self->{_files});
 }
 
+sub _readFromFilename {
+    my $self = shift;
+    my ($filename) = @_;
 
-sub _readFromFilehandle
-{
-	my ($this, $filehandle) = @_;
-	return unless $filehandle;
-
-	#handle has to be open
-	return unless fileno $filehandle;
-
-	local $/ = undef;
-	$this->{_filedata} = <$filehandle>;
-	close $filehandle;
-
-	return length($this->{_filedata});
+    my $handle;
+    open $handle, $filename or return;
+    binmode $handle;
+    return $self->_readFromFilehandle($handle);
 }
 
-sub _addFile
-{
-	my ($this, $file) = @_;
+sub _readFromFilehandle {
+    my $self = shift;
+    my ($filehandle) = @_;
+    return unless $filehandle;
 
-	return unless $file;
+    #handle has to be open
+    return unless fileno $filehandle;
 
-	foreach(qw/name date uid gid mode size data/)
-	{
-		unless(exists($file->{$_}))
-		{
-			$this->_dowarn("Can't _addFile because virtual file is missing $_ parameter");
-			return;
-		}
-	}
-	
-	if(exists($this->{_filehash}->{$file->{name}}))
-	{
-		$this->_dowarn("Can't _addFile because virtual file already exists with that name in the archive");
-		return;
-	}
+    local $/ = undef;
+    $self->{_filedata} = <$filehandle>;
+    close $filehandle;
 
-	push @{$this->{_files}}, $file->{name};
-	$this->{_filehash}->{$file->{name}} = $file;
-
-	return $file->{name};
+    return length($self->{_filedata});
 }
 
-sub _remFile
-{
-	my ($this, $filename) = @_;
+sub _addFile {
+    my $self = shift;
+    my ($file) = @_;
 
-	return unless $filename;
-	if(exists($this->{_filehash}->{$filename}))
-	{
-		delete $this->{_filehash}->{$filename};
-		@{$this->{_files}} = grep(!/^$filename$/, @{$this->{_files}});
-		return 1;
-	}
-	
-	$this->_dowarn("Can't remove file $filename, because it doesn't exist in the archive");
-	return 0;
+    return unless $file;
+
+    for (qw/name date uid gid mode size data/) {
+        unless (exists($file->{$_})) {
+            $self->_dowarn(
+                    "Can't _addFile because virtual file is missing $_ parameter");
+            return;
+        }
+    }
+    
+    if (exists($self->{_filehash}->{$file->{name}})) {
+        $self->_dowarn("Can't _addFile because virtual file already exists with that name in the archive");
+        return;
+    }
+
+    push @{$self->{_files}}, $file->{name};
+    $self->{_filehash}->{$file->{name}} = $file;
+
+    return $file->{name};
 }
 
-sub _initValues
-{
-	my ($this) = @_;
+sub _remFile {
+    my $self = shift;
+    my ($filename) = @_;
 
-	$this->{_files} = [];
-	$this->{_filehash} = {};
-	$this->{_filedata} ="";
-
-	return;
+    return unless $filename;
+    if (exists($self->{_filehash}->{$filename})) {
+        delete $self->{_filehash}->{$filename};
+        @{$self->{_files}} = grep(!/^$filename$/, @{$self->{_files}});
+        return 1;
+    }
+    $self->_dowarn(
+        "Can't remove file $filename, because it doesn't exist in the archive");
+    return 0;
 }
 
-sub _dowarn
-{
-	my ($this, $warning) = @_;
+sub _initValues {
+    my $self = shift;
 
-	if($this->{_verbose})
-	{
-		warn "DEBUG: $warning";
-	}
+    $self->{_files} = [];
+    $self->{_filehash} = {};
+    $self->{_filedata} ="";
 
-	return;
+    return;
+}
+
+sub _dowarn {
+    my $self = shift;
+    my ($warning) = @_;
+
+    if ($self->{_verbose}) {
+        warn "DEBUG: $warning";
+    }
+    return;
 }
 
 1;
@@ -454,26 +397,26 @@ Archive::Ar - Interface for manipulating ar archives
 
 =head1 SYNOPSIS
 
-	use Archive::Ar;
+    use Archive::Ar;
 
-	my $ar = new Archive::Ar("./foo.ar");
+    my $ar = new Archive::Ar("./foo.ar");
 
-	$ar->add_data("newfile.txt","Some contents", $properties);
+    $ar->add_data("newfile.txt","Some contents", $properties);
 
-	$ar->add_files("./bar.tar.gz", "bat.pl")
-	$ar->add_files(["./again.gz"]);
+    $ar->add_files("./bar.tar.gz", "bat.pl")
+    $ar->add_files(["./again.gz"]);
 
-	$ar->remove("file1", "file2");
-	$ar->remove(["file1", "file2");
+    $ar->remove("file1", "file2");
+    $ar->remove(["file1", "file2");
 
-	my $filedata = $ar->get_content("bar.tar.gz");
+    my $filedata = $ar->get_content("bar.tar.gz");
 
-	my @files = $ar->list_files();
-	$ar->read("foo.deb");
+    my @files = $ar->list_files();
+    $ar->read("foo.deb");
 
-	$ar->write("outbound.ar");
+    $ar->write("outbound.ar");
 
-	$ar->DEBUG();
+    $ar->DEBUG();
 
 
 =head1 DESCRIPTION
@@ -570,13 +513,13 @@ Takes an filename and a set of data to represent it. Unlike C<add_files>, C<add_
 is a virtual add, and does not require data on disk to be present. The
 data is a hash that looks like:
 
-	$filedata = {
-        "data" => $data,
-        "uid" => $uid, #defaults to zero
-        "gid" => $gid, #defaults to zero
-        "date" => $date,  #date in epoch seconds. Defaults to now.
-        "mode" => $mode, #defaults to 0100644;
-	}
+    $filedata = {
+          "data" => $data,
+          "uid" => $uid, #defaults to zero
+          "gid" => $gid, #defaults to zero
+          "date" => $date,  #date in epoch seconds. Defaults to now.
+          "mode" => $mode, #defaults to 0100644;
+    }
 
 You cannot add_data over another file however.  This returns the file length in 
 bytes if it is successful, undef otherwise.
@@ -606,13 +549,13 @@ file would naturally contain.  If the file does not exist or no filename is
 given, this returns undef. On success, a hash is returned with the following
 keys:
 
-	name - The file name
-	date - The file date (in epoch seconds)
-	uid  - The uid of the file
-	gid  - The gid of the file
-	mode - The mode permissions
-	size - The size (in bytes) of the file
-	data - The contained data
+    name - The file name
+    date - The file date (in epoch seconds)
+    uid  - The uid of the file
+    gid  - The gid of the file
+    mode - The mode permissions
+    size - The size (in bytes) of the file
+    data - The contained data
 
 =back
 
