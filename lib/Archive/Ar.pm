@@ -12,6 +12,7 @@ use strict;
 use Exporter;
 use File::Spec;
 use Time::Local;
+use Carp qw(carp longmess);
 
 use vars qw($VERSION);
 $VERSION = '1.17';
@@ -22,20 +23,16 @@ use constant ARFMAG => "`\n";
 
 sub new {
     my $class = shift;
-    my ($filenameorhandle, $debug) = @_;
-
+    my $filenameorhandle = shift;
     my $self = bless {}, $class;
 
-    $self->{_verbose} = 0;
     $self->_initValues();
 
-    if ($debug) {
-        $self->DEBUG();
-    }
+    $self->DEBUG if shift;	# backward compatibility
 
     if ($filenameorhandle) {
         unless ($self->read($filenameorhandle)) {
-            $self->_dowarn("new() failed on filename or filehandle read");
+            $self->_error("new() failed on filename or filehandle read");
             return;
         }        
     }
@@ -52,19 +49,19 @@ sub read {
 
     if (ref $filenameorhandle eq "GLOB") {
         unless ($retval = $self->_readFromFilehandle($filenameorhandle)) {
-            $self->_dowarn("Read from filehandle failed");
+            $self->_error("Read from filehandle failed");
             return;
         }
     }
     else {
         unless ($retval = $self->_readFromFilename($filenameorhandle)) {
-            $self->_dowarn("Read from filename failed");
+            $self->_error("Read from filename failed");
             return;
         }
     }
 
     unless ($self->_parseData()) {
-        $self->_dowarn(
+        $self->_error(
                 "read() failed on data structure analysis. Probable bad file");
         return; 
     }
@@ -78,14 +75,14 @@ sub read_memory {
     $self->_initValues();
 
     unless ($data) {
-        $self->_dowarn("read_memory() can't continue because no data was given");
+        $self->_error("read_memory() can't continue because no data was given");
         return;
     }
 
     $self->{_filedata} = $data;
 
     unless ($self->_parseData()) {
-        $self->_dowarn(
+        $self->_error(
             "read_memory() failed on data structure analysis. Probable bad file");
         return;
     }
@@ -119,7 +116,7 @@ sub add_files {
     for my $filename (@$files) {
         my @props = stat($filename);
         unless (@props) {
-            $self->_dowarn(
+            $self->_error(
                "Could not stat() filename. add_files() for this file failed");
             next;
         }
@@ -135,7 +132,7 @@ sub add_files {
 
         local $/ = undef;
         unless (open HANDLE, $filename) {
-            $self->_dowarn(
+            $self->_error(
                     "Could not open filename. add_files() for this file failed");
             next;
         }
@@ -161,7 +158,7 @@ sub add_data {
     my ($filename, $data, $params) = @_;
 
     unless ($filename) {
-        $self->_dowarn("No filename given; add_data() can't proceed");
+        $self->_error("No filename given; add_data() can't proceed");
         return;
     }
 
@@ -179,7 +176,7 @@ sub add_data {
     $params->{mode} ||= 0100644;
     
     unless ($self->_addFile($params)) {
-        $self->_dowarn("add_data failed due to a failure in _addFile");
+        $self->_error("add_data failed due to a failure in _addFile");
         return;
     }
 
@@ -196,7 +193,7 @@ sub write {
     for (@{$self->{_files}}) {
         my $content = $self->get_content($_);
         unless ($content) {
-            $self->_dowarn(
+            $self->_error(
                     "Internal Error. $_ file in _files list but no filedata");
             next;
         }
@@ -220,7 +217,7 @@ sub write {
     return $outstr unless $filename;
 
     unless (open HANDLE, ">$filename") {
-        $self->_dowarn("Can't open filename $filename");
+        $self->_error("Can't open filename $filename");
         return;
     }
     binmode HANDLE;
@@ -234,12 +231,12 @@ sub get_content {
     my ($filename) = @_;
 
     unless ($filename) {
-        $self->_dowarn("get_content can't continue without a filename");
+        $self->_error("get_content can't continue without a filename");
         return;
     }
 
     unless (exists($self->{_filehash}->{$filename})) {
-        $self->_dowarn(
+        $self->_error(
                 "get_content failed because there is not a file named $filename");
         return;
     }
@@ -247,32 +244,30 @@ sub get_content {
     return $self->{_filehash}->{$filename};
 }
 
-sub WARN {
-    my $self = shift;
-    my $warn = shift;
-    $self->{_warn} = 1 unless defined($warn) && int($warn) == 0;
-}
-
 sub DEBUG {
     my $self = shift;
-    my ($verbose) = @_;
+    my $debug = shift;
 
-    $verbose = 1 unless (defined($verbose) and int($verbose) == 0);
-    $self->{_verbose} = $verbose;
-    return;
+    $self->{_warn} = 1 unless (defined($debug) and int($debug) == 0);
+}
+
+sub error {
+    my $self = shift;
+
+    return shift() ? $self->{_longmess} : $self->{_error};
 }
 
 sub _parseData {
     my $self = shift;
 
     unless ($self->{_filedata}) {
-        $self->_dowarn("Cannot parse this archive. It appears to be blank");
+        $self->_error("Cannot parse this archive. It appears to be blank");
         return;
     }
     my $scratchdata = $self->{_filedata};
 
     unless (substr($scratchdata, 0, SARMAG, "") eq ARMAG) {
-        $self->_dowarn("Bad magic header token. Either this file is not an ar archive, or it is damaged. If you are sure of the file integrity, Archive::Ar may not support this type of ar archive currently. Please report this as a bug");
+        $self->_error("Bad magic header token. Either this file is not an ar archive, or it is damaged. If you are sure of the file integrity, Archive::Ar may not support this type of ar archive currently. Please report this as a bug");
         return "";
     }
 
@@ -294,7 +289,7 @@ sub _parseData {
             $self->_addFile($headers);
         }
         else {
-            $self->_dowarn("File format appears to be corrupt. The file header is not of the right size, or does not exist at all");
+            $self->_error("File format appears to be corrupt. The file header is not of the right size, or does not exist at all");
             return;
         }
     }
@@ -335,14 +330,14 @@ sub _addFile {
 
     for (qw/name date uid gid mode size data/) {
         unless (exists($file->{$_})) {
-            $self->_dowarn(
+            $self->_error(
                     "Can't _addFile because virtual file is missing $_ parameter");
             return;
         }
     }
     
     if (exists($self->{_filehash}->{$file->{name}})) {
-        $self->_dowarn("Can't _addFile because virtual file already exists with that name in the archive");
+        $self->_error("Can't _addFile because virtual file already exists with that name in the archive");
         return;
     }
 
@@ -362,7 +357,7 @@ sub _remFile {
         @{$self->{_files}} = grep(!/^$filename$/, @{$self->{_files}});
         return 1;
     }
-    $self->_dowarn(
+    $self->_error(
         "Can't remove file $filename, because it doesn't exist in the archive");
     return 0;
 }
@@ -377,14 +372,15 @@ sub _initValues {
     return;
 }
 
-sub _dowarn {
+sub _error {
     my $self = shift;
-    my ($warning) = @_;
+    my $msg = shift;
 
-    if ($self->{_verbose}) {
-        warn "DEBUG: $warning";
+    $self->{_error} = $msg;
+    $self->{_longerror} = longmess($msg);
+    if ($self->{_debug}) {
+        carp $self->{_error};
     }
-    return;
 }
 
 1;
@@ -416,7 +412,7 @@ Archive::Ar - Interface for manipulating ar archives
 
     $ar->write("outbound.ar");
 
-    $ar->DEBUG();
+    $ar->error();
 
 
 =head1 DESCRIPTION
@@ -442,16 +438,12 @@ modules
 
 =item * C<new(I<$filename>)>
 
-=item * C<new(I<*GLOB>,I<$debug>)>
+=item * C<new(I<*GLOB>)>
 
 Returns a new Archive::Ar object.  Without a filename or glob, it returns an
 empty object.  If passed a filename as a scalar or in a GLOB, it will attempt
 to populate from either of those sources.  If it fails, you will receive 
 undef, instead of an object reference. 
-
-This also can take a second optional debugging parameter.  This acts exactly
-as if C<DEBUG()> is called on the object before it is returned.  If you have a
-C<new()> that keeps failing, this should help.
 
 =back
 
@@ -462,8 +454,7 @@ C<new()> that keeps failing, this should help.
 =item * C<read(I<*GLOB>)>;
 
 This reads a new file into the object, removing any ar archive already
-represented in the object.  Any calls to C<DEBUG()> are not lost by reading
-in a new file. Returns the number of bytes read, undef on failure.
+represented in the object.
 
 =back
 
@@ -574,13 +565,10 @@ of files successfully removed from the archive.
 
 =over 4
 
-=item * C<DEBUG()>
+=item * C<error(I<$bool>)>
 
-This method turns on debugging.  Optionally this can be done by passing in a 
-value as the second parameter to new.  While verbosity is enabled, 
-Archive::Ar will toss a C<warn()> if there is a suspicious condition or other 
-problem while proceeding. This should help iron out any problems you have
-while using the module.
+Returns the current error string, which is usually the last error reported.
+If a true value is provided, returns the error message and stack trace.
 
 =back
 
