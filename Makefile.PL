@@ -24,5 +24,19 @@ WriteMakefile(
 			ABSTRACT_FROM	=> 'lib/Archive/Ar.pm', # retrieve abstract from module
 			AUTHOR     	=> 'Jay Bonci <jay@bonci.com>') 
 		: ()),
+
+	META_MERGE	=>
+		{
+			'meta-spec' => { version => 2 },
+			resources =>
+				{
+					repository =>
+						{
+							type => 'git',
+							url  => 'https://github.com/jbazik/Archive-Ar.git',
+							web  => 'https://github.com/jbazik/Archive-Ar',
+						},
+				},
+		},
 );
 
