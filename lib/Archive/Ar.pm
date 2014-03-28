@@ -21,17 +21,29 @@ use constant ARMAG => "!<arch>\n";
 use constant SARMAG => length(ARMAG);
 use constant ARFMAG => "`\n";
 
+my $has_io_string;
+BEGIN {
+    $has_io_string = eval {
+        require IO::String;
+        import IO::String;
+    } || 0;
+}
+
 sub new {
     my $class = shift;
-    my $filenameorhandle = shift;
+    my $file = shift;
+    my $opts = shift;
     my $self = bless {}, $class;
 
     $self->_initValues();
 
-    $self->DEBUG if shift;	# backward compatibility
-
-    if ($filenameorhandle) {
-        unless ($self->read($filenameorhandle)) {
+    $self->{_opts} = $opts ? (ref $opts ? $opts : {warn => 1}) : {};
+    unless (exists $self->{_opts}->{chown}) {
+        $self->{_opts}->{chown} = ($> == 0 and $^O ne 'MacOS' and
+                                               $^O ne 'MSWin32')
+    }
+    if ($file) {
+        unless ($self->read($file)) {
             $self->_error("new() failed on filename or filehandle read");
             return;
         }        
@@ -41,36 +53,36 @@ sub new {
 
 sub read {
     my $self = shift;
-    my ($filenameorhandle) = @_;
-
-    my $retval;
+    my $file = shift;
+    my $fh;
 
     $self->_initValues();
 
-    if (ref $filenameorhandle eq "GLOB") {
-        unless ($retval = $self->_readFromFilehandle($filenameorhandle)) {
-            $self->_error("Read from filehandle failed");
-            return;
+    if (ref $file) {
+        $fh = $file;
+        unless (eval{*$file{IO}} or $fh->isa('IO::Handle')) {
+            return $self->_error("Not a filehandle");
         }
     }
     else {
-        unless ($retval = $self->_readFromFilename($filenameorhandle)) {
-            $self->_error("Read from filename failed");
-            return;
-        }
+        open $fh, $file or return;
+        binmode $fh;
     }
-
-    unless ($self->_parseData()) {
+    local $/ = undef;
+    my $data = <$fh>;
+    close $fh;
+        
+    unless ($self->_parseData($data)) {
         $self->_error(
                 "read() failed on data structure analysis. Probable bad file");
         return; 
     }
-    return $retval;
+    return length($data);
 }
 
 sub read_memory {
     my $self = shift;
-    my ($data) = @_;
+    my $data = shift;
 
     $self->_initValues();
 
@@ -79,14 +91,46 @@ sub read_memory {
         return;
     }
 
-    $self->{_filedata} = $data;
-
-    unless ($self->_parseData()) {
+    unless ($self->_parseData($data)) {
         $self->_error(
             "read_memory() failed on data structure analysis. Probable bad file");
         return;
     }
     return length($data);
+}
+
+sub contains_file {
+    my $self = shift;
+    my $filename = shift;
+
+    return unless defined $filename;
+    return exists $self->{_filehash}->{$filename};
+}
+
+sub extract {
+    my $self = shift;
+
+    for my $filename (@_ or @{$self->{_files}}) {
+        my $meta = $self->{_filehash}->{$filename};
+        open my $fh, '>', $filename or return $self->_error("$filename: $!");
+        binmode $fh;
+        syswrite $fh, $meta->{data} or return $self->_error("$filename: $!");
+        close $fh or return $self->_error("$filename: $!");
+        if ($self->{_opts}->{chown}) {
+            chown $meta->{uid}, $meta->{gid}, $filename or
+					return $self->_error("$filename: $!");
+        }
+        if ($self->{_opts}->{chmod}) {
+            my $mode = $meta->{mode};
+            if ($self->{_opts}->{perms}) {
+                $mode &= ~(oct(7000) | umask);
+            }
+            chmod $mode, $filename or return $self->_error("$filename: $!");
+        }
+        utime $meta->{date}, $meta->{date}, $filename or
+					return $self->_error("$filename: $!");
+    }
+    return 1;
 }
 
 sub remove {
@@ -244,11 +288,30 @@ sub get_content {
     return $self->{_filehash}->{$filename};
 }
 
-sub DEBUG {
+sub get_data {
     my $self = shift;
-    my $debug = shift;
+    my $filename = shift;
 
-    $self->{_warn} = 1 unless (defined($debug) and int($debug) == 0);
+    return $self->_error("$filename: no such member")
+			unless exists $self->{_filehash}->{$filename};
+    return $self->{_filehash}->{$filename}->{data};
+}
+
+sub get_handle {
+    my $self = shift;
+    my $filename = shift;
+    my $fh;
+
+    return $self->_error("$filename: no such member")
+			unless exists $self->{_filehash}->{$filename};
+    if ($has_io_string) {
+        $fh = IO::String->new($self->{_filehash}->{$filename}->{data});
+    }
+    else {
+        open $fh, \$self->{_filehash}->{$filename}->{data} or
+			return $self->_error("in-memory file: $!");
+    }
+    return $fh;
 }
 
 sub error {
@@ -257,22 +320,27 @@ sub error {
     return shift() ? $self->{_longmess} : $self->{_error};
 }
 
+#
+# deprecated
+#
+sub DEBUG {
+    my $self = shift;
+    my $debug = shift;
+
+    $self->{_opts}->{warn} = 1 unless (defined($debug) and int($debug) == 0);
+}
+
 sub _parseData {
     my $self = shift;
+    my $data = shift;
 
-    unless ($self->{_filedata}) {
-        $self->_error("Cannot parse this archive. It appears to be blank");
-        return;
-    }
-    my $scratchdata = $self->{_filedata};
-
-    unless (substr($scratchdata, 0, SARMAG, "") eq ARMAG) {
+    unless (substr($data, 0, SARMAG, "") eq ARMAG) {
         $self->_error("Bad magic header token. Either this file is not an ar archive, or it is damaged. If you are sure of the file integrity, Archive::Ar may not support this type of ar archive currently. Please report this as a bug");
         return "";
     }
 
-    while ($scratchdata =~ /\S/) {
-        if ($scratchdata =~ s/^(.{58})`\n//s) {
+    while ($data =~ /\S/) {
+        if ($data =~ s/^(.{58})`\n//s) {
             my $headers = {};
             @$headers{qw/name date uid gid mode size/} =
                 unpack("A16A12A6A6A8A10", $1);
@@ -282,9 +350,9 @@ sub _parseData {
             }
             $headers->{mode} = oct($headers->{mode});
 
-            $headers->{data} = substr($scratchdata, 0, $headers->{size}, "");
+            $headers->{data} = substr($data, 0, $headers->{size}, "");
             # delete padding, if any
-            substr($scratchdata, 0, $headers->{size} % 2, "");
+            substr($data, 0, $headers->{size} % 2, "");
 
             $self->_addFile($headers);
         }
@@ -295,31 +363,6 @@ sub _parseData {
     }
 
     return scalar($self->{_files});
-}
-
-sub _readFromFilename {
-    my $self = shift;
-    my ($filename) = @_;
-
-    my $handle;
-    open $handle, $filename or return;
-    binmode $handle;
-    return $self->_readFromFilehandle($handle);
-}
-
-sub _readFromFilehandle {
-    my $self = shift;
-    my ($filehandle) = @_;
-    return unless $filehandle;
-
-    #handle has to be open
-    return unless fileno $filehandle;
-
-    local $/ = undef;
-    $self->{_filedata} = <$filehandle>;
-    close $filehandle;
-
-    return length($self->{_filedata});
 }
 
 sub _addFile {
@@ -381,6 +424,7 @@ sub _error {
     if ($self->{_debug}) {
         carp $self->{_error};
     }
+    return;
 }
 
 1;
@@ -403,9 +447,11 @@ Archive::Ar - Interface for manipulating ar archives
     $ar->add_files(["./again.gz"]);
 
     $ar->remove("file1", "file2");
-    $ar->remove(["file1", "file2");
+    $ar->remove(["file1", "file2"]);
 
-    my $filedata = $ar->get_content("bar.tar.gz");
+    my $filehash = $ar->get_content("bar.tar.gz");
+    my $data = $ar->get_data("bar.tar.gz");
+    my $handle = $ar->get_handle("bar.tar.gz");
 
     my @files = $ar->list_files();
     $ar->read("foo.deb");
@@ -466,6 +512,15 @@ This read information from the first parameter, and attempts to parse and treat
 it like an ar archive. Like C<read()>, it will wipe out whatever you have in the
 object and replace it with the contents of the new archive, even if it fails.
 Returns the number of bytes read (processed) if successful, undef otherwise.
+
+=back
+
+=over 4
+
+=item * C<contains_file(I<$filename>)>
+
+Returns true if the archive contains a file with $filename.  Returns
+undef otherwise.
 
 =back
 
@@ -553,11 +608,32 @@ keys:
 
 =over 4
 
+=item * C<get_data(I<"filename">)>
+
+Returns a scalar containing the file data of the given archive
+member.  Upon error, returns undef.
+
+=back
+
+
+=over 4
+
+=item * C<get_handle(I<"filename">)>
+
+Returns a file handle to the in-memory file data of the given archive member.
+Upon error, returns undef.  This can be useful for unpacking nested archives.
+Uses IO::String if it's loaded.
+
+=back
+
+
+=over 4
+
 =item * C<remove(I<"filename1">, I<"filename2">)>
 
 =item * C<remove(I<["filename1", "filename2"]>)>
 
-The remove method takes a filenames as a list or as an arrayref, and removes
+The remove method takes filenames as a list or as an arrayref, and removes
 them, one at a time, from the Archive::Ar object.  This returns the number
 of files successfully removed from the archive.
 
