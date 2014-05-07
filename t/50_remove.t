@@ -1,8 +1,10 @@
 use strict;
 use warnings;
+
 use Test::More tests => 2;
 use File::Temp qw( tempdir );
 use File::Spec;
+
 use Archive::Ar;
 
 my $dir = tempdir( CLEANUP => 1 );
@@ -10,15 +12,11 @@ my $fn  = File::Spec->catfile($dir, 'foo.ar');
 
 note "fn = $fn";
 
-do { 
-  open my $fh, '>', $fn;
-  binmode $fh;
-  while(<DATA>) {
-    chomp;
-    print $fh unpack('u', $_);
-  }
-  close $fh;
-};
+my $content = do {local $/ = undef; <DATA>};
+open my $fh, '>', $fn or die "$fn: $!\n";
+binmode $fh;
+print $fh $content;
+close $fh;
 
 subtest 'remove list' => sub {
   plan tests => 3;
@@ -30,7 +28,7 @@ subtest 'remove list' => sub {
   is $count, 2, 'count = 2';
   diag $@ if $@;
 
-  is_deeply scalar $ar->list_files, [map { "$_.txt" } qw( bar )], "just bar";
+  is_deeply scalar $ar->list_files, ['bar.txt'], "just bar";
 };
 
 subtest 'remove ref' => sub {
@@ -43,13 +41,17 @@ subtest 'remove ref' => sub {
   is $count, 2, 'count = 2';
   diag $@ if $@;
 
-  is_deeply scalar $ar->list_files, [map { "$_.txt" } qw( bar )], "just bar";
+  is_deeply scalar $ar->list_files, ['bar.txt'], "just bar";
 };
 
 __DATA__
-M(3QA<F-H/@IF;V\N='AT("`@("`@("`@,3,X-#,T-#0R,R`@,3`P,"`@,3`P
-M,"`@,3`P-C0T("`Y("`@("`@("`@8`IH:2!T:&5R90H*8F%R+G1X="`@("`@
-M("`@(#$S.#0S-#0T,C,@(#$P,#`@(#$P,#`@(#$P,#8T-"`@,S$@("`@("`@
-M(&`*=&AI<R!I<R!T:&4@8V]N=&5N="!O9B!B87(N='AT"@IB87HN='AT("`@
-M("`@("`@,3,X-#,T-#0R,R`@,3`P,"`@,3`P,"`@,3`P-C0T("`Q,2`@("`@
-1("`@8`IA;F0@86=A:6XN"@H`
+!<arch>
+foo.txt         1384344423  1000  1000  100644  9         `
+hi there
+
+bar.txt         1384344423  1000  1000  100644  31        `
+this is the content of bar.txt
+
+baz.txt         1384344423  1000  1000  100644  11        `
+and again.
+

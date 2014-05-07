@@ -1,15 +1,19 @@
-#!/usr/bin/perl -w
+use strict;
+use warnings;
 
-use Test::More (tests => 2);
+use Test::More tests => 2;
 use strict;
 
-use Archive::Ar();
+use Archive::Ar;
 
-my ($padding_archive) = new Archive::Ar();
-$padding_archive->add_data("test.txt", "here\n");
-my ($archive_results) = $padding_archive->write();
-ok(length($archive_results) == 74, "Archive::Ar pads un-even number of bytes successfully\n");
-$padding_archive = new Archive::Ar();
-$padding_archive->add_data("test.txt", "here1\n");
-$archive_results = $padding_archive->write();
-ok(length($archive_results) == 74, "Archive::Ar pads even number of bytes successfully\n");
+my $ar;
+
+$ar = Archive::Ar->new();
+$ar->add_data("test.txt", "here\n");
+my $content = $ar->write();
+ok length($content) == 74, 'odd size archive padded';
+
+$ar = new Archive::Ar();
+$ar->add_data("test.txt", "here1\n");
+$content = $ar->write();
+ok length($content) == 74, 'even size archive not padded';

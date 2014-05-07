@@ -1,9 +1,11 @@
 use strict;
 use warnings;
+
 use Test::More tests => 4;
-use Archive::Ar;
 use File::Temp qw( tempdir );
 use File::Spec;
+
+use Archive::Ar qw(GNU BSD);
 
 my $dir = tempdir( CLEANUP => 1 );
 note "dir = $dir";
@@ -39,14 +41,12 @@ subtest 'write string' => sub {
 };
 
 subtest 'write bsd' => sub {
-  #plan tests => 2;
-  plan skip_all => 'Not yet implemented';
+  plan tests => 2;
   
   my $ar = before();
-  $ar->set_output_format_bsd;
   my $fn = File::Spec->catfile($dir, "libfoo.a");
   
-  my $size = $ar->write($fn);
+  my $size = $ar->write($fn, {type=>BSD});
   note "size = $size";
   ok $size, 'write';
   
@@ -55,15 +55,13 @@ subtest 'write bsd' => sub {
   check_content(Archive::Ar->new($fn));
 };
 
-subtest 'write svr4' => sub {
-  #plan tests => 2;
-  plan skip_all => 'Not yet implemented';
+subtest 'write gnu' => sub {
+  plan tests => 2;
   
   my $ar = before();
-  $ar->set_output_format_svr4;
   my $fn = File::Spec->catfile($dir, "libfoo.a");
   
-  my $size = $ar->write($fn);
+  my $size = $ar->write($fn, {type=>GNU});
   note "size = $size";
   ok $size, 'write';
   

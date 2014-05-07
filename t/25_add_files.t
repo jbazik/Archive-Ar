@@ -1,9 +1,11 @@
 use strict;
 use warnings;
+
 use Test::More tests => 2;
-use Archive::Ar;
 use File::Temp qw( tempdir );
 use File::Spec;
+
+use Archive::Ar;
 
 my $dir = tempdir( CLEANUP => 1 );
 
@@ -15,8 +17,7 @@ my %data = (
   baz => "Truck, not monkey",
 );
 
-foreach my $name (keys %data)
-{
+for my $name (keys %data) {
   open(my $fh, '>', File::Spec->catfile($dir, "$name.txt"));
   print $fh $data{$name};
   close $fh;
@@ -27,11 +28,11 @@ subtest 'add list' => sub {
 
   my $ar = Archive::Ar->new;
   
-  my $count = $ar->add_files(map { File::Spec->catfile($dir, "$_.txt") } qw( foo bar baz ));
+  my $count = $ar->add_files(map { File::Spec->catfile($dir, "$_.txt") }
+                                 qw( foo bar baz ));
   is $count, 3, 'add_files';
   
-  foreach my $name (qw( foo bar baz ))
-  {
+  for my $name (qw( foo bar baz )) {
     is $ar->get_content("$name.txt")->{data}, $data{$name}, "data for $name";
   }
 };
@@ -41,11 +42,11 @@ subtest 'add ref' => sub {
 
   my $ar = Archive::Ar->new;
   
-  my $count = $ar->add_files(map { File::Spec->catfile($dir, "$_.txt") } qw( foo bar baz ));
+  my $count = $ar->add_files(map { File::Spec->catfile($dir, "$_.txt") }
+                                 qw( foo bar baz ));
   is $count, 3, 'add_files';
   
-  foreach my $name (qw( foo bar baz ))
-  {
+  for my $name (qw( foo bar baz )) {
     is $ar->get_content("$name.txt")->{data}, $data{$name}, "data for $name";
   }
 };

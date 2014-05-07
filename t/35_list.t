@@ -1,0 +1,70 @@
+use strict;
+use warnings;
+
+use Test::More tests => 3;
+use File::Temp qw( tempdir );
+use File::Spec;
+
+use Archive::Ar;
+
+my $dir = tempdir( CLEANUP => 1 );
+my $fn  = File::Spec->catfile($dir, 'foo.ar');
+
+note "fn = $fn";
+
+my $content = do {local $/ = undef; <DATA>};
+open my $fh, '>', $fn or die "$fn: $!\n";
+binmode $fh;
+print $fh $content;
+close $fh;
+
+my $filenames = [ qw(foo.txt bar.txt baz.txt) ];
+
+subtest 'filename' => sub {
+  plan tests => 3;
+  
+  my $ar = Archive::Ar->new($fn);
+  isa_ok $ar, 'Archive::Ar';
+
+  is_deeply scalar $ar->list_files, $filenames, "scalar context";
+  is_deeply [$ar->list_files],      $filenames, "list context";
+};
+
+subtest 'glob' => sub {
+  plan tests => 3;
+
+  open my $fh, '<', $fn;
+  my $ar = Archive::Ar->new($fh);
+  isa_ok $ar, 'Archive::Ar';
+
+  is_deeply scalar $ar->list_files, $filenames, "scalar context";
+  is_deeply [$ar->list_files],      $filenames, "list context";
+};
+
+subtest 'memory' => sub {
+  plan tests => 4;
+
+  open my $fh, '<', $fn;
+  my $data = do { local $/; <$fh> };
+  close $fh;
+  
+  my $ar = Archive::Ar->new;
+  isa_ok $ar, 'Archive::Ar';
+  is $ar->read_memory($data), 242, "size matches";
+
+  is_deeply scalar $ar->list_files, $filenames, "scalar context";
+  is_deeply [$ar->list_files],      $filenames, "list context";
+};
+
+
+__DATA__
+!<arch>
+foo.txt         1384344423  1000  1000  100644  9         `
+hi there
+
+bar.txt         1384344423  1000  1000  100644  31        `
+this is the content of bar.txt
+
+baz.txt         1384344423  1000  1000  100644  11        `
+and again.
+
