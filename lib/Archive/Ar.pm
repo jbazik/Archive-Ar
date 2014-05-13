@@ -496,24 +496,27 @@ Archive::Ar - Interface for manipulating ar archives
 
     use Archive::Ar;
 
-    my $ar = new Archive::Ar("./foo.ar");
+    my $ar = Archive::Ar->new;
 
-    $ar->add_data("newfile.txt","Some contents", $properties);
+    $ar->read('./foo.ar');
+    $ar->extract;
 
-    $ar->add_files("./bar.tar.gz", "bat.pl")
-    $ar->add_files(["./again.gz"]);
+    $ar->add_files('./bar.tar.gz', 'bat.pl')
+    $ar->add_data('newfile.txt','Some contents');
 
-    $ar->remove("file1", "file2");
-    $ar->remove(["file1", "file2"]);
+    $ar->chmod('file1', 0644);
+    $ar->chown('file1', $uid, $gid);
 
-    my $filehash = $ar->get_content("bar.tar.gz");
-    my $data = $ar->get_data("bar.tar.gz");
-    my $handle = $ar->get_handle("bar.tar.gz");
+    $ar->remove('file1', 'file2');
+
+    my $filehash = $ar->get_content('bar.tar.gz');
+    my $data = $ar->get_data('bar.tar.gz');
+    my $handle = $ar->get_handle('bar.tar.gz');
 
     my @files = $ar->list_files();
-    $ar->read("foo.deb");
 
-    $ar->write("outbound.ar");
+    my $archive = $ar->write;
+    my $size = $ar->write('outbound.ar');
 
     $ar->error();
 
@@ -522,7 +525,7 @@ Archive::Ar - Interface for manipulating ar archives
 
 Archive::Ar is a pure-perl way to handle standard ar archives.  
 
-This is useful if you have those types of old archives on the system, but it 
+This is useful if you have those types of archives on the system, but it 
 is also useful because .deb packages for the Debian GNU/Linux distribution are 
 ar archives. This is one building block in a future chain of modules to build, 
 manipulate, extract, and test debian modules with no platform or architecture 
@@ -530,10 +533,9 @@ dependence.
 
 You may notice that the API to Archive::Ar is similar to Archive::Tar, and
 this was done intentionally to keep similarity between the Archive::*
-modules
+modules.
 
-
-=head2 Class Methods
+=head2 Object Methods
 
 =over 4
 
@@ -543,10 +545,10 @@ modules
 
 =item * C<new(I<$filehandle>)>
 
-Returns a new Archive::Ar object.  Without a filename or glob, it returns an
-empty object.  If passed a filename as a scalar or in a GLOB, it will attempt
-to populate from either of those sources.  If it fails, you will receive 
-undef, instead of an object reference. 
+Returns a new Archive::Ar object.  Without an argument, it returns
+an empty object.  If passed a filename or an open filehandle, it will
+read the referenced archive into memory.  If the read fails for any
+reason, returns undef.
 
 =back
 
@@ -566,6 +568,8 @@ exceed 16 characters in length, bsd archives look like the common format.
 
 =item * C<clear()>
 
+Clears the current in-memory archive.
+
 =back
 
 =over 4
@@ -575,7 +579,8 @@ exceed 16 characters in length, bsd archives look like the common format.
 =item * C<read(I<$filehandle>)>;
 
 This reads a new file into the object, removing any ar archive already
-represented in the object.
+represented in the object.  The argument may be a filename, filehandle
+or IO::Handle object.
 
 =back
 
@@ -583,10 +588,9 @@ represented in the object.
 
 =item * C<read_memory(I<$data>)>
 
-This read information from the first parameter, and attempts to parse and treat
-it like an ar archive. Like C<read()>, it will wipe out whatever you have in the
-object and replace it with the contents of the new archive, even if it fails.
-Returns the number of bytes read (processed) if successful, undef otherwise.
+Parses the string argument as an archive, reading it into memory.  Replaces
+any previously loaded archive.  Returns the number of bytes read, or undef
+if it fails.
 
 =back
 
@@ -605,17 +609,30 @@ undef otherwise.
 
 =item * C<extract_file(I<$filename>)>
 
+Extracts files from the archive.  The first form extracts all files, the
+latter extracts just the named file.  Extracted files are assigned the
+permissions and modification time stored in the archive, and, if possible,
+the user and group ownership.  Returns non-zero upon success, or undef if
+failure.
+
 =back
 
 =over 4
 
 =item * C<rename(I<$filename>, I<$newname>)>
 
+Changes the name of a file in the in-memory archive.
+
 =back
 
 =over 4
 
-=item * C<remove(I<$filename>)>
+=item * C<remove(I<@filenames>)>
+
+=item * C<remove(I<$arrayref>)>
+
+Removes files from the in-memory archive.  Returns the number of files
+removed.
 
 =back
 
@@ -623,43 +640,38 @@ undef otherwise.
 
 =item * C<list_files()>
 
-This lists the files contained inside of the archive by filename, as an array.
+Returns a list of the names of all the files in the archive.
 If called in a scalar context, returns a reference to an array.
 
 =back
 
 =over 4
 
-=item * C<add_files(I<"filename1">, I<"filename2">)>
+=item * C<add_files(I<@filenames>)>
 
-=item * C<add_files(I<["filename1", "filename2"]>)>
+=item * C<add_files(I<$arrayref>)>
 
-Takes an array or an arrayref of filenames to add to the ar archive, in order.
-The filenames can be paths to files, in which case the path information is 
-stripped off.  Filenames longer than 16 characters are truncated when written
-to disk in the format, so keep that in mind when adding files.
+Adds files to the archive.  The arguments can be paths, but only the
+filenames are stored in the archive.  Stores the uid, gid, mode, size,
+and modification timestamp of the file as returned by C<stat()>.
 
-Due to the nature of the ar archive format, C<add_files()> will store the uid,
-gid, mode, size, and creation date of the file as returned by C<stat()>; 
-
-C<add_files()> returns the number of files successfully added, or undef on failure.
+Returns the number of files successfully added, or undef if failure.
 
 =back
 
 =over 4
 
-=item * C<add_data(I<"filename">, I<$filedata>)>
+=item * C<add_data(I<"filename">, I<$data>, [I<$optional_hashref>])>
 
-Takes an filename and a set of data to represent it. Unlike C<add_files>, C<add_data>
-is a virtual add, and does not require data on disk to be present. The
-data is a hash that looks like:
+Adds a file to the in-memory archive with name $filename and content
+$data.  File properties can be set with $optional_hashref:
 
-    $filedata = {
-          "data" => $data,
-          "uid" => $uid, #defaults to zero
-          "gid" => $gid, #defaults to zero
-          "date" => $date,  #date in epoch seconds. Defaults to now.
-          "mode" => $mode, #defaults to 0100644;
+    $optional_hashref = {
+        'data' => $data,
+        'uid' => $uid, #defaults to zero
+        'gid' => $gid, #defaults to zero
+        'date' => $date,  #date in epoch seconds. Defaults to now.
+        'mode' => $mode, #defaults to 0100644;
     }
 
 You cannot add_data over another file however.  This returns the file length in 
@@ -672,34 +684,33 @@ bytes if it is successful, undef otherwise.
 
 =item * C<write()>
 
-=item * C<write(I<"filename.ar">)>
+=item * C<write(I<$filename>)>
 
-This method will return the data as an .ar archive, or will write to the 
-filename present if specified.  If given a filename, C<write()> will return the 
-length of the file written, in bytes, or undef on failure.  If the filename
-already exists, it will overwrite that file.
+Returns the archive as a string, or writes it to disk as $filename.
+Returns the archive size upon success when writing to disk.  Returns
+undef if failure.
 
 =back
 
 =over 4
 
-=item * C<get_content(I<"filename">)>
+=item * C<get_content(I<$filename>)>
 
-This returns a hash with the file content in it, including the data that the 
-file would naturally contain.  If the file does not exist or no filename is
-given, this returns undef. On success, a hash is returned with the following
-keys:
+This returns a hash with the file content in it, including the data
+that the file would contain.  If the file does not exist or no filename
+is given, this returns undef. On success, a hash is returned:
 
-    name - The file name
-    date - The file date (in epoch seconds)
-    uid  - The uid of the file
-    gid  - The gid of the file
-    mode - The mode permissions
-    size - The size (in bytes) of the file
-    data - The contained data
+    $returned_hash = {
+        'name' => $filename,
+        'date' => $mtime,
+        'uid' => $uid,
+        'gid' => $gid,
+        'mode' => $mode,
+        'size' => $size,
+        'data' => $file_contents,
+    }
 
 =back
-
 
 =over 4
 
@@ -709,7 +720,6 @@ Returns a scalar containing the file data of the given archive
 member.  Upon error, returns undef.
 
 =back
-
 
 =over 4
 
@@ -721,50 +731,16 @@ Uses IO::String if it's loaded.
 
 =back
 
-
 =over 4
 
-=item * C<remove(I<"filename1">, I<"filename2">)>
-
-=item * C<remove(I<["filename1", "filename2"]>)>
-
-The remove method takes filenames as a list or as an arrayref, and removes
-them, one at a time, from the Archive::Ar object.  This returns the number
-of files successfully removed from the archive.
-
-=back
-
-=over 4
-
-=item * C<error(I<$bool>)>
+=item * C<error(I<$trace>)>
 
 Returns the current error string, which is usually the last error reported.
 If a true value is provided, returns the error message and stack trace.
 
 =back
 
-=head1 TODO
-
-A better unit test suite perhaps. I have a private one, but a public one would be
-nice if there was good file faking module.
-
-Fix / investigate stuff in the BUGS section.
-
 =head1 BUGS
-
-To be honest, I'm not sure of a couple of things. The first is that I know 
-of ar archives made on old AIX systems (pre 4.3?) that have a different header
-with a different magic string, etc.  This module perfectly (hopefully) handles
-ar archives made with the modern ar command from the binutils distribution. If
-anyone knows of anyway to produce these old-style AIX archives, or would like
-to produce a few for testing, I would be much grateful.
-
-There's no really good reason why this module I<shouldn't> run on Win32 
-platforms, but admittedly, this might change when we have a file exporting 
-function that supports owner and permission writing.
-
-If you read in and write out a file, you get different md5sums, but it's still
-a valid archive. I'm still investigating this, and consider it a minor bug.
 
 See https://github.com/jbazik/Archive-Ar/issues/ to report and view bugs.
 
