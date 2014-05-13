@@ -34,7 +34,8 @@ my $has_io_string;
 BEGIN {
     $has_io_string = eval {
         require IO::String;
-        import IO::String;
+        IO::String->import();
+        1;
     } || 0;
 }
 
@@ -43,7 +44,7 @@ sub new {
     my $file = shift;
     my $opts = shift || {};
     my $self = bless {}, $class;
-    my $defopts = {chmod => 1};
+    my $defopts = {chmod => 1, same_perms => ($> == 0) ? 1:0, chown => 1};
 
     $self->clear();
     $self->{opts} = {(%$defopts, %{ref $opts ? $opts : {warn => 1}})};
@@ -129,14 +130,14 @@ sub extract_file {
     binmode $fh;
     syswrite $fh, $meta->{data} or return $self->_error("$filename: $!");
     close $fh or return $self->_error("$filename: $!");
-    if (CAN_CHOWN) {
+    if (CAN_CHOWN && $self->{opts}->{chown}) {
         chown $meta->{uid}, $meta->{gid}, $filename or
 					return $self->_error("$filename: $!");
     }
     if ($self->{opts}->{chmod}) {
         my $mode = $meta->{mode};
-        if ($self->{opts}->{perms}) {
-            $mode &= ~(oct(7000) | umask);
+        unless ($self->{opts}->{same_perms}) {
+            $mode &= ~(oct(7000) | (umask | 0));
         }
         chmod $mode, $filename or return $self->_error("$filename: $!");
     }
@@ -355,8 +356,8 @@ sub get_handle {
         $fh = IO::String->new($self->{files}->{$filename}->{data});
     }
     else {
-        open $fh, \$self->{files}->{$filename}->{data} or
-			return $self->_error("in-memory file: $!");
+        my $data = $self->{files}->{$filename}->{data};
+        open $fh, '<', \$data or return $self->_error("in-memory file: $!");
     }
     return $fh;
 }
@@ -475,7 +476,7 @@ sub _error {
 
     $self->{error} = $msg;
     $self->{longerror} = longmess($msg);
-    if ($self->{opts}->{debug}) {
+    if ($self->{opts}->{warn} > 1) {
         carp $self->{longerror};
     }
     elsif ($self->{opts}->{warn}) {
@@ -554,7 +555,52 @@ reason, returns undef.
 
 =over 4
 
-=item * C<get_ar_type()>
+=item * C<set_opt(I<$name>, I<$val>)>
+
+Assign option $name value $val.  Possible options are:
+
+=over 8
+
+=item * warn
+
+Warning level.  Levels are zero for no warnings, 1 for brief warnings,
+and 2 for warnings with a stack trace.  Default is zero.
+
+=item * chmod
+
+Change the file permissions of files created when extracting.  Default
+is true (non-zero).
+
+=item * same_perms
+
+When setting file permissions, use the values in the archive unchanged.
+If false, removes setuid bits and applies the user's umask.  Default is
+true for the root user, false otherwise.
+
+=item * chown
+
+Change the owners of extracted files, if possible.  Default is true.
+
+=item * type
+
+Archive type.  May be GNU, BSD or COMMON, or undef if no archive has
+been read.  Defaults to the type of the archive read, or undef.
+
+=back
+
+=back
+
+=over 4
+
+=item * C<get_opt(I<$name>)>
+
+Returns the value of option $name.
+
+=back
+
+=over 4
+
+=item * C<type()>
 
 Returns the type of the ar archive.  The type is undefined until an
 archive is loaded.  If the archive displays characteristics of a gnu-style

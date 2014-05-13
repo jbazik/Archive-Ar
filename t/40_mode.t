@@ -8,7 +8,7 @@ use Archive::Ar;
 
 my ($fh, $file) = tempfile(UNLINK => 1);
 
-my $content = do {local $/; <DATA>};
+my $content = do {local $/ = undef; <DATA>};
 print $fh $content;
 close $fh;
 

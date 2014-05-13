@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 3;
+use Test::More tests => 4;
 use File::Temp qw( tempdir );
 use File::Spec;
 
@@ -45,7 +45,7 @@ subtest 'memory' => sub {
   plan tests => 4;
 
   open my $fh, '<', $fn;
-  my $data = do { local $/; <$fh> };
+  my $data = do { local $/ = undef; <$fh> };
   close $fh;
   
   my $ar = Archive::Ar->new;
@@ -56,6 +56,28 @@ subtest 'memory' => sub {
   is_deeply [$ar->list_files],      $filenames, "list context";
 };
 
+subtest 'rename' => sub {
+  plan tests => 6;
+
+  open my $fh, '<', $fn;
+  my $data = do { local $/ = undef; <$fh> };
+  close $fh;
+  
+  my $ar = Archive::Ar->new;
+  isa_ok $ar, 'Archive::Ar';
+  is $ar->read_memory($data), 242, "size matches";
+
+  my $renames = $filenames;
+  $renames->[1] = 'goo.txt';
+  $ar->rename('bar.txt', 'goo.txt');
+  is_deeply scalar $ar->list_files, $filenames, "scalar context";
+  is_deeply [$ar->list_files],      $filenames, "list context";
+
+  $renames->[2] = 'zoo.txt';
+  $ar->rename('baz.txt', 'zoo.txt');
+  is_deeply scalar $ar->list_files, $filenames, "scalar context";
+  is_deeply [$ar->list_files],      $filenames, "list context";
+};
 
 __DATA__
 !<arch>

@@ -11,8 +11,9 @@ END { chdir $wd; }
 use Archive::Ar;
 
 my $dir = tempdir(CLEANUP => 1);
-my $content = do {local $/; <DATA>};
+my $content = do {local $/ = undef; <DATA>};
 
+umask 0;
 my $ar  = Archive::Ar->new();
 ok $ar->read_memory($content), 'read_memory' or diag $ar->error;
 chdir $dir or die;

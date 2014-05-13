@@ -5,7 +5,7 @@ use Test::More tests => 3;
 
 use Archive::Ar qw(GNU);
 
-my $content = do {local $/; <DATA>};
+my $content = do {local $/ = undef; <DATA>};
 
 my $ar = Archive::Ar->new();
 ok $ar->read_memory($content) or diag $ar->error;
