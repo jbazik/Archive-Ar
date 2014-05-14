@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 19;
+use Test::More tests => 20;
 
 use File::Temp qw(tempfile);
 use Archive::Ar;
@@ -36,7 +36,8 @@ is $filedata->{data}, "evencontent\n",	'file2, filedata/data';
 
 my ($nfh, $nfile) = tempfile(UNLINK => 1);
 
-print $nfh $ar->write;
+my $size = $ar->write($nfh);
+is $size, 152, 'write size';
 close $nfh;
 
 my $nar = Archive::Ar->new($nfile);

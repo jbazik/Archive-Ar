@@ -536,30 +536,26 @@ You may notice that the API to Archive::Ar is similar to Archive::Tar, and
 this was done intentionally to keep similarity between the Archive::*
 modules.
 
-=head2 Object Methods
+=head1 METHODS
 
-=over 4
+=head2 new
 
-=item * C<new()>
-
-=item * C<new(I<$filename>)>
-
-=item * C<new(I<$filehandle>)>
+  $ar = Archive::Ar->new()
+  $ar = Archive::Ar->new($filename)
+  $ar = Archive::Ar->new($filehandle)
 
 Returns a new Archive::Ar object.  Without an argument, it returns
 an empty object.  If passed a filename or an open filehandle, it will
 read the referenced archive into memory.  If the read fails for any
 reason, returns undef.
 
-=back
+=head2 set_opt
 
-=over 4
-
-=item * C<set_opt(I<$name>, I<$val>)>
+  $ar->set_opt($name, $val)
 
 Assign option $name value $val.  Possible options are:
 
-=over 8
+=over 4
 
 =item * warn
 
@@ -588,19 +584,15 @@ been read.  Defaults to the type of the archive read, or undef.
 
 =back
 
-=back
+=head2 get_opt
 
-=over 4
-
-=item * C<get_opt(I<$name>)>
+  $val = $ar->get_opt($name)
 
 Returns the value of option $name.
 
-=back
+=head2 type
 
-=over 4
-
-=item * C<type()>
+  $type = $ar->type()
 
 Returns the type of the ar archive.  The type is undefined until an
 archive is loaded.  If the archive displays characteristics of a gnu-style
@@ -608,52 +600,41 @@ archive, GNU is returned.  If it looks like a bsd-style archive, BSD
 is returned.  Otherwise, COMMON is returned.  Note that unless filenames
 exceed 16 characters in length, bsd archives look like the common format.
 
-=back
+=head2 clear
 
-=over 4
-
-=item * C<clear()>
+  $ar->clear()
 
 Clears the current in-memory archive.
 
-=back
+=head2 read
 
-=over 4
-
-=item * C<read(I<$filename>)>
-
-=item * C<read(I<$filehandle>)>;
+  $len = $ar->read($filename)
+  $len = $ar->read($filehandle)
 
 This reads a new file into the object, removing any ar archive already
 represented in the object.  The argument may be a filename, filehandle
-or IO::Handle object.
+or IO::Handle object.  Returns the size of the file contents or undef
+if it fails.
 
-=back
+=head2 read_memory
 
-=over 4
-
-=item * C<read_memory(I<$data>)>
+  $len = $ar->read_memory($data)
 
 Parses the string argument as an archive, reading it into memory.  Replaces
 any previously loaded archive.  Returns the number of bytes read, or undef
 if it fails.
 
-=back
+=head2 contains_file
 
-=over 4
-
-=item * C<contains_file(I<$filename>)>
+  $bool = $ar->contains_file($filename)
 
 Returns true if the archive contains a file with $filename.  Returns
 undef otherwise.
 
-=back
+=head2 extract
 
-=over 4
-
-=item * C<extract()>
-
-=item * C<extract_file(I<$filename>)>
+  $ar->extract()
+  $ar->extract_file($filename)
 
 Extracts files from the archive.  The first form extracts all files, the
 latter extracts just the named file.  Extracted files are assigned the
@@ -661,41 +642,31 @@ permissions and modification time stored in the archive, and, if possible,
 the user and group ownership.  Returns non-zero upon success, or undef if
 failure.
 
-=back
+=head2 rename
 
-=over 4
-
-=item * C<rename(I<$filename>, I<$newname>)>
+  $ar->rename($filename, $newname)
 
 Changes the name of a file in the in-memory archive.
 
-=back
+=head2 remove
 
-=over 4
-
-=item * C<remove(I<@filenames>)>
-
-=item * C<remove(I<$arrayref>)>
+  $ar->remove(@filenames)
+  $ar->remove($arrayref)
 
 Removes files from the in-memory archive.  Returns the number of files
 removed.
 
-=back
+=head2 list_files
 
-=over 4
-
-=item * C<list_files()>
+  @filenames = $ar->list_files()
 
 Returns a list of the names of all the files in the archive.
 If called in a scalar context, returns a reference to an array.
 
-=back
+=head2 add_files
 
-=over 4
-
-=item * C<add_files(I<@filenames>)>
-
-=item * C<add_files(I<$arrayref>)>
+  $ar->add_files(@filenames)
+  $ar->add_files($arrayref)
 
 Adds files to the archive.  The arguments can be paths, but only the
 filenames are stored in the archive.  Stores the uid, gid, mode, size,
@@ -703,50 +674,43 @@ and modification timestamp of the file as returned by C<stat()>.
 
 Returns the number of files successfully added, or undef if failure.
 
-=back
+=head2 add_data
 
-=over 4
-
-=item * C<add_data(I<"filename">, I<$data>, [I<$optional_hashref>])>
+  $ar->add_data("filename", $data)
+  $ar->add_data("filename", $data, $options)
 
 Adds a file to the in-memory archive with name $filename and content
 $data.  File properties can be set with $optional_hashref:
 
-    $optional_hashref = {
-        'data' => $data,
-        'uid' => $uid, #defaults to zero
-        'gid' => $gid, #defaults to zero
-        'date' => $date,  #date in epoch seconds. Defaults to now.
-        'mode' => $mode, #defaults to 0100644;
-    }
+  $options = {
+      'data' => $data,
+      'uid' => $uid,    #defaults to zero
+      'gid' => $gid,    #defaults to zero
+      'date' => $date,  #date in epoch seconds. Defaults to now.
+      'mode' => $mode,  #defaults to 0100644;
+  }
 
 You cannot add_data over another file however.  This returns the file length in 
 bytes if it is successful, undef otherwise.
 
-=back
+=head2 write
 
-=over 4
-
-
-=item * C<write()>
-
-=item * C<write(I<$filename>)>
+  $data = $ar->write()
+  $len = $ar->write($filename)
 
 Returns the archive as a string, or writes it to disk as $filename.
 Returns the archive size upon success when writing to disk.  Returns
 undef if failure.
 
-=back
+=head2 get_content
 
-=over 4
-
-=item * C<get_content(I<$filename>)>
+  $content = $ar->get_content($filename)
 
 This returns a hash with the file content in it, including the data
 that the file would contain.  If the file does not exist or no filename
 is given, this returns undef. On success, a hash is returned:
 
-    $returned_hash = {
+    $content = {
         'name' => $filename,
         'date' => $mtime,
         'uid' => $uid,
@@ -756,35 +720,27 @@ is given, this returns undef. On success, a hash is returned:
         'data' => $file_contents,
     }
 
-=back
+=head2 get_data
 
-=over 4
-
-=item * C<get_data(I<"filename">)>
+  $data = $ar->get_data("filename")
 
 Returns a scalar containing the file data of the given archive
 member.  Upon error, returns undef.
 
-=back
+=head2 get_handle
 
-=over 4
-
-=item * C<get_handle(I<"filename">)>
+  $handle = $ar->get_handle(I<"filename">)>
 
 Returns a file handle to the in-memory file data of the given archive member.
 Upon error, returns undef.  This can be useful for unpacking nested archives.
 Uses IO::String if it's loaded.
 
-=back
+=head2 error
 
-=over 4
-
-=item * C<error(I<$trace>)>
+  $errstr = $ar->error($trace)
 
 Returns the current error string, which is usually the last error reported.
 If a true value is provided, returns the error message and stack trace.
-
-=back
 
 =head1 BUGS
 

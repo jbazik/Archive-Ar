@@ -21,7 +21,6 @@ ok !$mock->called('read'), 'read not called if new with no options';
 
 $ar = Archive::Ar->new('myfilename');
 is $ar, undef, 'new fails if read fails';
-
 ok $mock->called('read'), 'read called if new with filename';
 $mock->clear();
 
