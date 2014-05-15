@@ -10,7 +10,7 @@ my $ar;
 can_ok 'Archive::Ar', 'DEBUG';
 
 $ar = Archive::Ar->new();
-is $ar->get_opt('warn'), undef, 'warn off by default';
+is $ar->get_opt('warn'), 0, 'warn off by default';
 
 $ar->DEBUG();
 is $ar->get_opt('warn'), 1, 'DEBUG method sets warn';

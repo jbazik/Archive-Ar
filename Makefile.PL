@@ -5,10 +5,9 @@ WriteMakefile(
 	'VERSION_FROM'	=> 'lib/Archive/Ar.pm', # finds $VERSION
 	'PREREQ_PM'	=>
 		{ 
-			'Test::More' => '0.45',
-			'File::Spec' => '0.83',
-			'Time::Local' => '1.04',
-			'Test::MockObject' => '0.12',
+			'Test::More' => '0',
+			'Test::MockObject' => '0',
+			'File::Spec' => '0',
 			'File::Temp' => '0',
 		},
 

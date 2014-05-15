@@ -42,12 +42,17 @@ BEGIN {
 sub new {
     my $class = shift;
     my $file = shift;
-    my $opts = shift || {};
+    my $opts = shift || 0;
     my $self = bless {}, $class;
-    my $defopts = {chmod => 1, same_perms => ($> == 0) ? 1:0, chown => 1};
+    my $defopts = {
+        chmod => 1,
+        chown => 1,
+        same_perms => ($> == 0) ? 1:0,
+    };
+    $opts = {warn => $opts} unless ref $opts;
 
     $self->clear();
-    $self->{opts} = {(%$defopts, %{ref $opts ? $opts : {warn => 1}})};
+    $self->{opts} = {(%$defopts, %{$opts})};
     if ($file) {
         return unless $self->read($file);
     }
