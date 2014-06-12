@@ -653,6 +653,21 @@ failure.
 
 Changes the name of a file in the in-memory archive.
 
+=head2 chmod
+
+  $ar->chmod($filename, $mode);
+
+Change the mode of the member to C<$mode>.
+
+=head2 chown
+
+  $ar->chown($filename, $uid, $gid);
+  $ar->chown($filename, $uid);
+
+Change the ownership of the member to user id C<$uid> and (optionally) group id C<$gid>.
+
+=head2 chown
+
 =head2 remove
 
   $ar->remove(@filenames)
