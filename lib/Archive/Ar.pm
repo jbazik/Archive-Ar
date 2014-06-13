@@ -186,8 +186,8 @@ sub chown {
     my $gid = shift;
 
     return unless $self->{files}->{$filename};
-    $self->{files}->{$filename}->{uid} = $uid;
-    $self->{files}->{$filename}->{gid} = $gid if defined $gid;
+    $self->{files}->{$filename}->{uid} = $uid if $uid >= 0;
+    $self->{files}->{$filename}->{gid} = $gid if defined $gid && $gid >= 0;
     return 1;
 }
 
@@ -664,9 +664,8 @@ Change the mode of the member to C<$mode>.
   $ar->chown($filename, $uid, $gid);
   $ar->chown($filename, $uid);
 
-Change the ownership of the member to user id C<$uid> and (optionally) group id C<$gid>.
-
-=head2 chown
+Change the ownership of the member to user id C<$uid> and (optionally)
+group id C<$gid>.  Negative id values are ignored.
 
 =head2 remove
 
