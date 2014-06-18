@@ -17,7 +17,7 @@ use Time::Local;
 use Carp qw(carp longmess);
 
 use vars qw($VERSION);
-$VERSION = '2.00';
+$VERSION = '2.01';
 
 use constant CAN_CHOWN => ($> == 0 and $^O ne 'MacOS' and $^O ne 'MSWin32');
 
@@ -748,7 +748,7 @@ member.  Upon error, returns undef.
 
 =head2 get_handle
 
-  $handle = $ar->get_handle(I<"filename">)>
+  $handle = $ar->get_handle("filename")>
 
 Returns a file handle to the in-memory file data of the given archive member.
 Upon error, returns undef.  This can be useful for unpacking nested archives.

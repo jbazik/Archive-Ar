@@ -1,3 +1,7 @@
+Version 2.01 - Jun 18, 2014 - John Bazik <jbazik@cpan.org>
+
+	* Rewritten, many new methods, support for bsd and gnu ar formats.
+
 Version 1.17 - Mar 14, 2014 - John Bazik <jbazik@cpan.org>
 
 	* Fixed MANIFEST goof.  Doh!
