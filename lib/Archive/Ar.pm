@@ -48,6 +48,7 @@ sub new {
         chmod => 1,
         chown => 1,
         same_perms => ($> == 0) ? 1:0,
+        symbols => undef,
     };
     $opts = {warn => $opts} unless ref $opts;
 
@@ -118,7 +119,7 @@ sub contains_file {
 sub extract {
     my $self = shift;
 
-    for my $filename (@_ or @{$self->{names}}) {
+    for my $filename (@_ ? @_ : @{$self->{names}}) {
         $self->extract_file($filename) or return;
     }
     return 1;
@@ -276,22 +277,29 @@ sub write {
         if (my @longs = grep(length($_) > 15, @filenames)) {
             my $ptr = 0;
             for my $long (@longs) {
-                $gnuindex{$long . '/'} = $ptr;
+                $gnuindex{$long} = $ptr;
                 $ptr += length($long) + 2;
             }
             push @body, pack('A16A32A10A2', '//', '', $ptr, ARFMAG),
                         join("/\n", @longs, '');
+            push @body, "\n" if $ptr % 2; # padding
         }
     }
     for my $fn (@filenames) {
         my $meta = $self->{files}->{$fn};
         my $mode = sprintf('%o', $meta->{mode});
         my $size = $meta->{size};
+        my $name;
 
-        $fn .= '/' if $type eq GNU;
-
-        if (length($fn) <= 16 || $type eq COMMON) {
-            push @body, pack('A16A12A6A6A8A10A2', $fn,
+        if ($type eq GNU) {
+            $fn = '' if defined $opts->{symbols} && $fn eq $opts->{symbols};
+            $name = $fn . '/';
+        }
+        else {
+            $name = $fn;
+        }
+        if (length($name) <= 16 || $type eq COMMON) {
+            push @body, pack('A16A12A6A6A8A10A2', $name,
                               @$meta{qw/date uid gid/}, $mode, $size, ARFMAG);
         }
         elsif ($type eq GNU) {
@@ -299,10 +307,10 @@ sub write {
                               @$meta{qw/date uid gid/}, $mode, $size, ARFMAG);
         }
         elsif ($type eq BSD) {
-            $size += length($fn);
-            push @body, pack('A3A13A12A6A6A8A10A2', AR_EFMT1, length($fn),
+            $size += length($name);
+            push @body, pack('A3A13A12A6A6A8A10A2', AR_EFMT1, length($name),
                               @$meta{qw/date uid gid/}, $mode, $size, ARFMAG),
-                        $fn;
+                        $name;
         }
         else {
             return $self->_error("$type: unexpected ar type");
@@ -402,7 +410,15 @@ sub _parse {
             $type = GNU;
             if ($name eq '//') {
                 $names = substr($data, 0, $size, '');
+                substr($data, 0, $size % 2, '');
                 next;
+            }
+            elsif ($name eq '/') {
+                $name = $self->{opts}->{symbols};
+                unless (defined $name && $name) {
+                    substr($data, 0, $size + $size % 2, '');
+                    next;
+                }
             }
             else {
                 $name = substr($names, int(substr($name, 1)));
@@ -437,22 +453,22 @@ sub _add_data {
     my $self = shift;
     my $filename = shift;
     my $content = shift || '';
-    my $date = shift || timelocal(localtime());
-    my $uid = shift || 0;
-    my $gid = shift || 0;
-    my $mode = shift || 0100644;
-    my $size = shift || length($content);
+    my $date = shift;
+    my $uid = shift;
+    my $gid = shift;
+    my $mode = shift;
+    my $size = shift;
 
     if (exists($self->{files}->{$filename})) {
         return $self->_error("$filename: entry already exists");
     }
     $self->{files}->{$filename} = {
         name => $filename,
-        date => $date,
-        uid => $uid,
-        gid => $gid,
-        mode => $mode,
-        size => $size,
+        date => defined $date ? $date : timelocal(localtime()),
+        uid => defined $uid ? $uid : 0,
+        gid => defined $gid ? $gid : 0,
+        mode => defined $mode ? $mode : 0100644,
+        size => defined $size ? $size : length($content),
         data => $content,
     };
     push @{$self->{names}}, $filename;
@@ -586,6 +602,13 @@ Change the owners of extracted files, if possible.  Default is true.
 
 Archive type.  May be GNU, BSD or COMMON, or undef if no archive has
 been read.  Defaults to the type of the archive read, or undef.
+
+=item * symbols
+
+Provide a filename for the symbol table, if present.  If set, the symbol
+table is treated as a file that can be read from or written to an archive.
+It is an error if the filename provided matches the name of a file in the
+archive.  If undefined, the symbol table is ignored.  Defaults to undef.
 
 =back
 

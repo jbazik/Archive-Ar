@@ -23,4 +23,5 @@ t/50empty.t
 t/55_write.t
 t/60_extract.t
 t/65_gnu.t
+t/66_gnu_symtab.t
 t/70_bsd.t
