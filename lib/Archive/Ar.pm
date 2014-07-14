@@ -17,7 +17,7 @@ use Time::Local;
 use Carp qw(carp longmess);
 
 use vars qw($VERSION);
-$VERSION = '2.01';
+$VERSION = '2.02';
 
 use constant CAN_CHOWN => ($> == 0 and $^O ne 'MacOS' and $^O ne 'MSWin32');
 

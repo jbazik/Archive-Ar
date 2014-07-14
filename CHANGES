@@ -1,3 +1,10 @@
+Version 2.02 - Jul 9, 2014 - John Bazik <jbazik@cpan.org>
+
+	* Handle GNU format symbol tables (closes #5).
+	* Added "symbols" option.
+	* Fixed missing padding on GNU format extended names data section.
+	* Added a test for all of this.
+
 Version 2.01 - Jun 18, 2014 - John Bazik <jbazik@cpan.org>
 
 	* Rewritten, many new methods, support for bsd and gnu ar formats.
